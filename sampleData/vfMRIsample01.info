@@ -1,0 +1,2 @@
+cp /local/users/Proulx-S/db/vsmDiamCenSurP5/2025-01-23--bay2--vsmDiamCenSurP5/bids/func/sub-vsmDiamCenSurP5_ses-1_acq-vfMRIinflow_task-fixOnly_run-1_angio.nii.gz /scratch/users/Proulx-S/tools/bassWrap-reg/sampleData/vfMRIsample01.nii.gz
+cp /local/users/Proulx-S/db/vsmDiamCenSurP5/2025-01-23--bay2--vsmDiamCenSurP5/bids/func/sub-vsmDiamCenSurP5_ses-1_acq-vfMRIinflow_task-fixOnly_run-1_angio.json   /scratch/users/Proulx-S/tools/bassWrap-reg/sampleData/vfMRIsample01.json

@@ -19,7 +19,9 @@ function param = afni_2dImReg(fSource,fBase,fOut,spSmFac,confirmFlag)
     cmd{end+1} = ['-rprefix ' fOut];
 
 
+    disp('2dImReg: running')
     [status,cmdout] = system(strjoin(cmd,newline)); if status || isempty(cmdout); dbstack; error(cmdout); error('x'); end
+    disp('2dImReg: done')
 
 
 

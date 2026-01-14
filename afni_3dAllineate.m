@@ -1,6 +1,8 @@
 function cmdout = afni_3dAllineate(fSource,fBase,fMaskE,fOut,spSmFac)
     global src
 
+    fOut = replace(fOut,'.nii.gz','');
+
 
     afni3dAlineateArg = {'-cost lpa+ZZ' '-interp quintic' '-final wsinc5' '-nopad' '-conv 0' '-nmatch 100%' '-onepass' '-nocmass'};
 
@@ -30,5 +32,7 @@ function cmdout = afni_3dAllineate(fSource,fBase,fMaskE,fOut,spSmFac)
     
     cmd{end+1} = '-warp shift_rotate'; % cmd{end+1} = ['-warp shift_rotate -parfix 2 0 -parfix 4 0 -parfix 5 0'];
 
+    disp('3dAllineate: running')
     [status,cmdout] = system(strjoin(cmd,newline)); if status || isempty(cmdout); dbstack; error(cmdout); error('x'); end
-
+    disp('3dAllineate: done')
+    
