@@ -5,7 +5,7 @@ function rho = imCorr(fRun,fMaskE)
         mri    = MRIread(fRun);
         im     = single(mri.vol);
 
-        mri    = MRIread(fMask);
+        mri    = MRIread(fMaskE);
         imMask = ~logical(mri.vol);
 
         im = permute(im,[4 1 2 3]);

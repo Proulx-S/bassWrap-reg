@@ -24,14 +24,14 @@ FIXED(FIXED==Inf) = 1;
 % Replace -Inf values with 0
 FIXED(FIXED==-Inf) = 0;
 
-% Normalize input data to range in [0,1].
-FIXEDmin = min(FIXED(:));
-FIXEDmax = max(FIXED(:));
-if isequal(FIXEDmax,FIXEDmin)
-    FIXED = 0*FIXED;
-else
-    FIXED(finiteIdx) = (FIXED(finiteIdx) - FIXEDmin) ./ (FIXEDmax - FIXEDmin);
-end
+% % Normalize input data to range in [0,1].
+% FIXEDmin = min(FIXED(:));
+% FIXEDmax = max(FIXED(:));
+% if isequal(FIXEDmax,FIXEDmin)
+%     FIXED = 0*FIXED;
+% else
+%     FIXED(finiteIdx) = (FIXED(finiteIdx) - FIXEDmin) ./ (FIXEDmax - FIXEDmin);
+% end
 
 % Normalize MOVING image
 
@@ -47,14 +47,14 @@ MOVING(MOVING==Inf) = 1;
 % Replace -Inf values with 0
 MOVING(MOVING==-Inf) = 0;
 
-% Normalize input data to range in [0,1].
-MOVINGmin = min(MOVING(:));
-MOVINGmax = max(MOVING(:));
-if isequal(MOVINGmax,MOVINGmin)
-    MOVING = 0*MOVING;
-else
-    MOVING(finiteIdx) = (MOVING(finiteIdx) - MOVINGmin) ./ (MOVINGmax - MOVINGmin);
-end
+% % Normalize input data to range in [0,1].
+% MOVINGmin = min(MOVING(:));
+% MOVINGmax = max(MOVING(:));
+% if isequal(MOVINGmax,MOVINGmin)
+%     MOVING = 0*MOVING;
+% else
+%     MOVING(finiteIdx) = (MOVING(finiteIdx) - MOVINGmin) ./ (MOVINGmax - MOVINGmin);
+% end
 
 % Default spatial referencing objects
 fixedRefObj = imref2d(size(FIXED));
@@ -63,7 +63,7 @@ movingRefObj = imref2d(size(MOVING));
 % Phase correlation
 tform = imregcorr(MOVING,movingRefObj,FIXED,fixedRefObj,'Method','gradcorr','transformtype','rigid');
 MOVINGREG.Transformation = tform;
-MOVINGREG.RegisteredImage = imwarp(MOVING, movingRefObj, tform, 'OutputView', fixedRefObj, 'SmoothEdges', true);
+MOVINGREG.RegisteredImage = imwarp(MOVING, movingRefObj, tform, 'OutputView', fixedRefObj, 'SmoothEdges', true, 'Interp', 'cubic');
 
 % Store spatial referencing object
 MOVINGREG.SpatialRefObj = fixedRefObj;

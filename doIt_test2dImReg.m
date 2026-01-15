@@ -95,6 +95,14 @@ copyfile(dataFile   ,fRun0   );
 copyfile(dataMaskInv,fMaskInv);
 
 %% Test matlab functions
+% GUI
+mri = MRIread(fRun0);
+im = squeeze(single(mri.vol));
+imA = im(:,:,10);
+imB = im(:,:,20);
+registrationEstimator(imA,imB)
+
+% registrationEstimator-generated functions
 mri = MRIread(fRun0);
 im0 = squeeze(single(mri.vol));
 im0 = im0 - min(mri.vol(:));
@@ -111,18 +119,39 @@ for ii = 1:size(im0,3)
     im0_regPhaseCorr(:,:,ii) = tmp.RegisteredImage;
 end
 
-imCorr(im0)
-imCorr(im0_regMono)
-imCorr(im0_regPhaseCorr)
+im00             = imCorr(im0);
+im00regMono      = imCorr(im0_regMono);
+im00regPhaseCorr = imCorr(im0_regPhaseCorr);
+
+im00(            diag(true(size(im00,1),1))            ) = nan;
+im00regMono(     diag(true(size(im00regMono,1),1))     ) = nan;
+im00regPhaseCorr(diag(true(size(im00regPhaseCorr,1),1))) = nan;
 
 
 
 
-mri = MRIread(fRun0);
-im = squeeze(single(mri.vol));
-imA = im(:,:,10);
-imB = im(:,:,20);
-registrationEstimator(imA,imB)
+hFig = figure('Name','Mean images','Menu','none','ToolBar','none');
+tgroup = uitabgroup(hFig);
+
+t1 = uitab(tgroup, 'Title', 'Original');
+axes1 = axes('Parent', t1);
+% imagesc(mean(im0,3,'omitnan'), 'Parent', axes1,[0 0.7]); axis image off; colormap gray;
+imagesc(im0(:,:,50), 'Parent', axes1,[0 0.7]); axis image off; colormap gray;
+title(axes1,'Original');
+
+t2 = uitab(tgroup, 'Title', 'Monomodal Reg');
+axes2 = axes('Parent', t2);
+% imagesc(mean(im0_regMono,3,'omitnan'), 'Parent', axes2,[0 0.7]); axis image off; colormap gray;
+imagesc(im0_regMono(:,:,50), 'Parent', axes2,[0 0.7]); axis image off; colormap gray;
+title(axes2,'Monomodal Reg');
+
+t3 = uitab(tgroup, 'Title', 'PhaseCorr Reg');
+axes3 = axes('Parent', t3);
+% imagesc(mean(im0_regPhaseCorr,3,'omitnan'), 'Parent', axes3,[0 0.7]); axis image off; colormap gray;
+imagesc(im0_regPhaseCorr(:,:,50), 'Parent', axes3,[0 0.7]); axis image off; colormap gray;
+title(axes3,'PhaseCorr Reg');
+
+
 
 
 
@@ -143,8 +172,8 @@ mriMaskInv = MRIread(fMaskInv);
 % make average base image
 fBase0 = replace(fRun0,'.nii.gz','_avgBase.nii.gz');
 afni_2dImReg(fRun0,fRun0,fBase0);
-imCorr(fRun0,fMaskInv);
-imCorr(fBase0,fMaskInv);
+% imCorr(fRun0,fMaskInv);
+% imCorr(fBase0,fMaskInv);
 mri = MRIread(fBase0); mri.vol = mean(mri.vol,4); MRIwrite(mri,fBase0);
 
 % register run to average base image using 3dAllineate
@@ -156,28 +185,33 @@ motAllin = afni_3dAllineate(fRun0,fBase0,fMaskInv,fRun_3dAllin,4);
 fRun_ImReg = replace(fRun0,'.nii.gz','_ImReg.nii.gz');
 motImReg = afni_2dImReg(fRun0,fBase0,fRun_ImReg);
 
-% apply 2dImReg motion with 3dAllineate
-trans = [motImReg(1) 0 motImReg(2)];
-rot   = [0 0 motImReg(3)];
-fRun_ImReg_allinApplied = replace(fRun0,'.nii.gz','_ImReg_allinApplied.nii.gz');
-afni_applyAffine(fRun0,trans,rot,fRun_ImReg_allinApplied)
+% % apply 2dImReg motion with 3dAllineate
+% trans = [motImReg(1) 0 motImReg(2)];
+% rot   = [0 0 motImReg(3)];
+% fRun_ImReg_allinApplied = replace(fRun0,'.nii.gz','_ImReg_allinApplied.nii.gz');
+% afni_applyAffine(fRun0,trans,rot,fRun_ImReg_allinApplied)
 
-run0Corr = imCorr(fRun0,fMaskInv);
+run0Corr       = imCorr(fRun0,fMaskInv);
 run3dAllinCorr = imCorr(fRun_3dAllin,fMaskInv);
-runImRegCorr = imCorr(fRun_ImReg,fMaskInv);
-runImRegAllinAppliedCorr = imCorr(fRun_ImReg_allinApplied,fMaskInv);
+runImRegCorr   = imCorr(fRun_ImReg,fMaskInv);
+% runImRegAllinAppliedCorr = imCorr(fRun_ImReg_allinApplied,fMaskInv);
 
 run0Corr(diag(true(size(run0Corr,1),1))) = nan;
 run3dAllinCorr(diag(true(size(run3dAllinCorr,1),1))) = nan;
 runImRegCorr(diag(true(size(runImRegCorr,1),1))) = nan;
-runImRegAllinAppliedCorr(diag(true(size(runImRegAllinAppliedCorr,1),1))) = nan;
+% runImRegAllinAppliedCorr(diag(true(size(runImRegAllinAppliedCorr,1),1))) = nan;
 
 figure('Menu','none','ToolBar','none');
+plot(mean(im00,2,'omitnan')); hold on
+plot(mean(im00regMono,2,'omitnan')); hold on
+plot(mean(im00regPhaseCorr,2,'omitnan')); hold on
 plot(mean(run0Corr,2,'omitnan')); hold on
 plot(mean(run3dAllinCorr,2,'omitnan'));
 plot(mean(runImRegCorr,2,'omitnan'));
-plot(mean(runImRegAllinAppliedCorr,2,'omitnan'));
-legend('run0','3dAllin','ImReg','ImReg_allinApplied','interpreter','none');
+% plot(mean(runImRegAllinAppliedCorr,2,'omitnan'));
+% legend('run0','3dAllin','ImReg','ImReg_allinApplied','interpreter','none');
+% legend('run0','3dAllin','ImReg','interpreter','none');
+legend('im00','im00_regMono','im00_regPhaseCorr','run0','3dAllin','ImReg','interpreter','none');
 ylim([0 1]);
 
 

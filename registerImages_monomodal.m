@@ -1,4 +1,4 @@
-function [MOVINGREG] = registerImages(MOVING,FIXED)
+function [MOVINGREG] = registerImages_monomodal(MOVING,FIXED)
 %registerImages  Register grayscale images using auto-generated code from Registration Estimator app.
 %  [MOVINGREG] = registerImages(MOVING,FIXED) Register grayscale images
 %  MOVING and FIXED using auto-generated code from the Registration
@@ -24,14 +24,14 @@ FIXED(FIXED==Inf) = 1;
 % Replace -Inf values with 0
 FIXED(FIXED==-Inf) = 0;
 
-% Normalize input data to range in [0,1].
-FIXEDmin = min(FIXED(:));
-FIXEDmax = max(FIXED(:));
-if isequal(FIXEDmax,FIXEDmin)
-    FIXED = 0*FIXED;
-else
-    FIXED(finiteIdx) = (FIXED(finiteIdx) - FIXEDmin) ./ (FIXEDmax - FIXEDmin);
-end
+% % Normalize input data to range in [0,1].
+% FIXEDmin = min(FIXED(:));
+% FIXEDmax = max(FIXED(:));
+% if isequal(FIXEDmax,FIXEDmin)
+%     FIXED = 0*FIXED;
+% else
+%     FIXED(finiteIdx) = (FIXED(finiteIdx) - FIXEDmin) ./ (FIXEDmax - FIXEDmin);
+% end
 
 % Normalize MOVING image
 
@@ -47,14 +47,14 @@ MOVING(MOVING==Inf) = 1;
 % Replace -Inf values with 0
 MOVING(MOVING==-Inf) = 0;
 
-% Normalize input data to range in [0,1].
-MOVINGmin = min(MOVING(:));
-MOVINGmax = max(MOVING(:));
-if isequal(MOVINGmax,MOVINGmin)
-    MOVING = 0*MOVING;
-else
-    MOVING(finiteIdx) = (MOVING(finiteIdx) - MOVINGmin) ./ (MOVINGmax - MOVINGmin);
-end
+% % Normalize input data to range in [0,1].
+% MOVINGmin = min(MOVING(:));
+% MOVINGmax = max(MOVING(:));
+% if isequal(MOVINGmax,MOVINGmin)
+%     MOVING = 0*MOVING;
+% else
+%     MOVING(finiteIdx) = (MOVING(finiteIdx) - MOVINGmin) ./ (MOVINGmax - MOVINGmin);
+% end
 
 % Default spatial referencing objects
 fixedRefObj = imref2d(size(FIXED));
@@ -81,9 +81,9 @@ initTform = affinetform2d();
 initTform.A(1:2,3) = [translationX ; translationY];
 
 % Apply transformation
-tform = imregtform(MOVING,movingRefObj,FIXED,fixedRefObj,'similarity',optimizer,metric,'PyramidLevels',3,'InitialTransformation',initTform);
+tform = imregtform(MOVING,movingRefObj,FIXED,fixedRefObj,'rigid',optimizer,metric,'PyramidLevels',3,'InitialTransformation',initTform);
 MOVINGREG.Transformation = tform;
-MOVINGREG.RegisteredImage = imwarp(MOVING, movingRefObj, tform, 'OutputView', fixedRefObj, 'SmoothEdges', true);
+MOVINGREG.RegisteredImage = imwarp(MOVING, movingRefObj, tform, 'OutputView', fixedRefObj, 'SmoothEdges', true, 'Interp', 'cubic');
 
 % Store spatial referencing object
 MOVINGREG.SpatialRefObj = fixedRefObj;
