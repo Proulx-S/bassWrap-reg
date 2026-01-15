@@ -100,13 +100,41 @@ mri = MRIread(fRun0);
 im = squeeze(single(mri.vol));
 imA = im(:,:,10);
 imB = im(:,:,20);
+mri10 = mri; mri10.vol = mri.vol(:,:,:,10);
+mri20 = mri; mri20.vol = mri.vol(:,:,:,20);
+fRun10 = replace(fRun0,'.nii.gz','_10.nii.gz');
+fRun20 = replace(fRun0,'.nii.gz','_20.nii.gz');
+MRIwrite(mri10,fRun10);
+MRIwrite(mri20,fRun20);
+
 registrationEstimator(imA,imB)
+
+medicalRegistrationEstimator(fRun0,fRun0)
+
+
 
 % registrationEstimator-generated functions
 mri = MRIread(fRun0);
 im0 = squeeze(single(mri.vol));
 im0 = im0 - min(mri.vol(:));
 im0 = im0./max(im0(:));
+
+[dispField,reg] = imreggroupwise(im0(:,:,[10:30 300:320]),'GridRegularization',inf);
+[dispField_reguInf,reg_reguInf] = imreggroupwise(im0(:,:,[10:30 300:320]),'GridRegularization',0.11,'GridSpacing',[10 10]);
+[dispField_regu1,reg_regu1] = imreggroupwise(im0(:,:,[10:30 300:320]),'GridRegularization',1);
+[dispField_regu0,reg_regu0] = imreggroupwise(im0(:,:,[10:30 300:320]),'GridRegularization',0);
+
+figure('Menu','none','ToolBar','none');
+cur = dispField_reguInf;
+i = 5;
+range = [-1 1].*max(max(max(max(abs(cur(:,:,:,i))))));
+histogram(cur(:));
+% range = [-1 1].*0.1;
+subplot(1,2,1);
+imagesc(cur(:,:,1,i),range); axis image off; colormap gray;
+subplot(1,2,2);
+imagesc(cur(:,:,2,i),range); axis image off; colormap gray;
+squeeze(mean(cur,[1 2]))
 
 baseIdx = 3;
 im0reg_monomodal = zeros(size(im0));
