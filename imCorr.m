@@ -1,14 +1,19 @@
 function rho = imCorr(fRun,fMaskE)
 
 
-    mri    = MRIread(fMaskE);
-    imMask = ~logical(mri.vol);
+    if ischar(fRun)
+        mri    = MRIread(fRun);
+        im     = single(mri.vol);
 
-    mri    = MRIread(fRun);
-    im     = single(mri.vol);
+        mri    = MRIread(fMask);
+        imMask = ~logical(mri.vol);
 
-    im = permute(im,[4 1 2 3]);
-    rho = corr(permute(im(:,imMask),[2 1]));
+        im = permute(im,[4 1 2 3]);
+        rho = corr(permute(im(:,imMask),[2 1]));
+    else
+        im = permute(fRun,[3 1 2]);
+        rho = corr(permute(im(:,:),[2 1]));
+    end
 
 
     fFig = figure('Menu','none','ToolBar','none');

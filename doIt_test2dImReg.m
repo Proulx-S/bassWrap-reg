@@ -27,13 +27,13 @@ if strcmp(os,'Linux') && strcmp(host,'takoyaki') && strcmp(user,'sebp')
     projectScratch = fullfile(scratchDrive, projectName, 'tmp'); if ~exist(projectScratch,'dir'); mkdir(projectScratch); end
     toolDir        = '/scratch/users/Proulx-S/tools';            if ~exist(toolDir,'dir');        mkdir(toolDir);        end
 else
-    % envId = 2;
-    % storageDrive = '/Users/sebastienproulx/Library/CloudStorage/OneDrive-Stanford/projects';
-    % scratchDrive = '/Users/sebastienproulx';
-    % projectCode    = fullfile(scratchDrive, projectName);        if ~exist(projectCode,'dir');    mkdir(projectCode);    end
-    % projectStorage = fullfile(storageDrive, projectName);        if ~exist(projectStorage,'dir'); mkdir(projectStorage); end
-    % projectScratch = fullfile(scratchDrive, projectName, 'tmp'); if ~exist(projectScratch,'dir'); mkdir(projectScratch); end
-    % toolDir        = fullfile(scratchDrive, 'tools');            if ~exist(toolDir,'dir');        mkdir(toolDir);        end
+    envId = 2;
+    storageDrive = '/Users/sebastienproulx/bassWrap-reg';
+    scratchDrive = '/Users/sebastienproulx/bassWrap-reg';
+    projectCode    = fullfile(scratchDrive, projectName);        if ~exist(projectCode,'dir');    mkdir(projectCode);    end
+    projectStorage = fullfile(storageDrive, projectName);        if ~exist(projectStorage,'dir'); mkdir(projectStorage); end
+    projectScratch = fullfile(scratchDrive, projectName, 'tmp'); if ~exist(projectScratch,'dir'); mkdir(projectScratch); end
+    toolDir        = '/Users/sebastienproulx/tools';             if ~exist(toolDir,'dir');        mkdir(toolDir);        end
 end
 
 % Load dependencies and set paths
@@ -93,6 +93,38 @@ fRun0    = fullfile(projectScratch,[b '.nii.gz']);
 fMaskInv = fullfile(projectScratch,[b '_mask.nii.gz']);
 copyfile(dataFile   ,fRun0   );
 copyfile(dataMaskInv,fMaskInv);
+
+%% Test matlab functions
+mri = MRIread(fRun0);
+im0 = squeeze(single(mri.vol));
+im0 = im0 - min(mri.vol(:));
+im0 = im0./max(im0(:));
+
+baseIdx = 3;
+im0reg_monomodal = zeros(size(im0));
+im0reg_phaseCorr = zeros(size(im0));
+for ii = 1:size(im0,3)
+    disp(['image ' num2str(ii) '/' num2str(size(im0,3))])
+    tmp = registerImages_monomodal(im0(:,:,ii),im0(:,:,baseIdx));
+    im0_regMono(:,:,ii) = tmp.RegisteredImage;
+    tmp = registerImages_phaseCorrelation(im0(:,:,ii),im0(:,:,baseIdx));
+    im0_regPhaseCorr(:,:,ii) = tmp.RegisteredImage;
+end
+
+imCorr(im0)
+imCorr(im0_regMono)
+imCorr(im0_regPhaseCorr)
+
+
+
+
+mri = MRIread(fRun0);
+im = squeeze(single(mri.vol));
+imA = im(:,:,10);
+imB = im(:,:,20);
+registrationEstimator(imA,imB)
+
+
 
 
 %% Test exactitude of motion parameter conversion from 2dImReg to 3dAllineate
