@@ -93,13 +93,7 @@ function param = afni_2dImReg(fSource,fBase,fOut,spSmFac,confirmFlag)
         imagesc(ax4,mriOut2); axis image; colormap gray;
         drawnow;
 
-
-        ax1.YLim = [125 175];
-        ax1.XLim = [125 175];
-        ax2.YLim = ax1.YLim;
-        ax2.XLim = ax1.XLim;
-        ax3.YLim = ax1.YLim;
-        ax3.XLim = ax1.XLim;
-        ax4.YLim = ax1.YLim;
-        ax4.XLim = ax1.XLim;
+        yLim = mean(ax1.YLim) + [-0.5 0.5]*range(ax1.YLim)/8;
+        xLim = mean(ax1.XLim) + [-0.5 0.5]*range(ax1.XLim)/8;
+        set([ax1 ax2 ax3 ax4],'YLim',yLim,'XLim',xLim);
     end

@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../util"
+		},
+		{
+			"path": "../../../../../tmp/afni/src"
+		}
+	],
+	"settings": {}
+}
