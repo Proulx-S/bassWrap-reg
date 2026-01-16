@@ -1,7 +1,7 @@
 function param = afni_2dImReg(fSource,fBase,fOut,spSmFac,confirmFlag)
     global src
     if ~exist('confirmFlag','var') || isempty(confirmFlag); confirmFlag = false; end
-    if ~exist('spSmFac','var') || isempty(spSmFac); spSmFac = 1; end
+    if ~exist('spSmFac','var'); spSmFac = []; end
 
     fOut = replace(fOut,'.nii.gz','');
     if exist([fOut '.nii.gz'],'file')
@@ -13,7 +13,9 @@ function param = afni_2dImReg(fSource,fBase,fOut,spSmFac,confirmFlag)
     cmd{end+1} = '2dImReg -overwrite \';
     cmd{end+1} = ['-input '    fSource ' \'];
     cmd{end+1} = ['-basefile ' fBase ' \'];
-    cmd{end+1} = ['-fine ' num2str(spSmFac) ' 0.07 0.21 \'];
+    if ~isempty(spSmFac)
+        cmd{end+1} = ['-fine ' num2str(spSmFac) ' 0.07 0.21 \'];
+    end
     cmd{end+1} = ['-prefix ' [fOut '.nii.gz'] ' \'];
     cmd{end+1} = ['-dprefix ' fOut ' \'];
     cmd{end+1} = ['-rprefix ' fOut];

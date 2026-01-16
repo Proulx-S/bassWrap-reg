@@ -91,22 +91,72 @@ dir(fullfile(projectStorage,'..','sampleData','*.nii.gz'));
 dataFile    = fullfile(projectStorage,'..','sampleData','vfMRIsample01.nii.gz');
 dataMaskInv = fullfile(projectStorage,'..','sampleData','vfMRIsample01_brainMask.nii.gz');
 
-mri = MRIread(dataFile);
-
-im = squeeze(single(mri.vol));
-im = im - min(im(:));
-im = im./max(im(:));
-im = im + randn(size(im))*0.01;
-mri.vol = single(im);
-MRIwrite(mri,dataFile);
-
-
-
 [~,b,~] = fileparts(replace(dataFile,'.nii.gz',''));
 fRun0    = fullfile(projectScratch,[b '.nii.gz']);
 fMaskInv = fullfile(projectScratch,[b '_mask.nii.gz']);
 copyfile(dataFile   ,fRun0   );
 copyfile(dataMaskInv,fMaskInv);
+
+% gold-standard registration
+% fBase0 = replace(fRun0,'.nii.gz','_base.nii.gz');
+mriMask = MRIread(fMaskInv);
+mri     = MRIread(fRun0);
+im0 = squeeze(mri.vol);
+im0 = im0 - min(im0(:));
+im0 = im0./max(im0(:));
+im0Base = mean(im0(:,:,10:60),3).*-(mriMask.vol-1);
+im0Base = mean(im0(:,:,10:60),3);
+im0 = im0(:,:,1:60);
+
+% MRIwrite(mri,fBase0);
+for i = 1:size(im0,3)
+    disp(['image ' num2str(i) '/' num2str(size(im0,3))])
+    im0_regPhaseCorr(i) = registerImages_phaseCorrelation(im0(:,:,i),im0Base);
+    im0_regMono(i)      = registerImages_monomodal(im0(:,:,i),im0Base,im0_regPhaseCorr_regPhaseCorr(i),-(mriMask.vol-1));
+end
+[dispField,im0_regGroupwise] = imreggroupwise(im0,'GridSpacing',[25 25]);
+
+
+fRun_regMono = replace(fRun0,'.nii.gz','_regMono.nii.gz');
+mri.vol = cat(4,im0_regMono.RegisteredImage);
+MRIwrite(mri,fRun_regMono);
+fRun_regPhaseCorr = replace(fRun0,'.nii.gz','_regPhaseCorr.nii.gz');
+mri.vol = cat(4,im0_regPhaseCorr.RegisteredImage);
+MRIwrite(mri,fRun_regPhaseCorr);
+fRun_regGroupwise = replace(fRun0,'.nii.gz','_regGroupwise.nii.gz');
+mri.vol = permute(im0_regGroupwise,[1 2 4 3]);
+MRIwrite(mri,fRun_regGroupwise);
+
+imCorr(fRun_regMono,fMaskInv);
+imCorr(fRun_regPhaseCorr,fMaskInv);
+imCorr(fRun_regGroupwise,fMaskInv);
+
+
+
+[dispField,im0_regGroupwise] = imreggroupwise(im0,'GridSpacing',[25 25]);
+
+
+
+fRun_ImReg = replace(fRun0,'.nii.gz','_2dImReg.nii.gz');
+motImReg = afni_2dImReg(fRun0,fBase0,fRun_ImReg);
+
+mri = MRIread(fRun_ImReg);
+mri.vol = mean(mri.vol,4);
+MRIwrite(mri,fBase0);
+motImReg = afni_2dImReg(fRun0,fBase0,fRun_ImReg);
+
+imCorr(fRun0     ,fMaskInv)
+imCorr(fRun_ImReg,fMaskInv)
+
+
+% mri = MRIread(fRun0);
+% im = squeeze(single(mri.vol));
+% im = im - min(im(:));
+% im = im./max(im(:));
+% im = im + randn(size(im))*0.01;
+% mri.vol = single(im);
+% MRIwrite(mri,fRun0);
+
 
 
 

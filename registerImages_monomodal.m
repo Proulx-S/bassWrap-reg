@@ -1,4 +1,4 @@
-function [MOVINGREG] = registerImages_monomodal(MOVING,FIXED)
+function [MOVINGREG] = registerImages_monomodal(MOVING,FIXED,MOVINGREG,WEIGHTS)
 %registerImages  Register grayscale images using auto-generated code from Registration Estimator app.
 %  [MOVINGREG] = registerImages(MOVING,FIXED) Register grayscale images
 %  MOVING and FIXED using auto-generated code from the Registration
@@ -68,20 +68,33 @@ optimizer.MaximumStepLength = 6.25000e-02;
 optimizer.MaximumIterations = 100;
 optimizer.RelaxationFactor = 0.500000;
 
-% Align centers
-fixedCenterXWorld = mean(fixedRefObj.XWorldLimits);
-fixedCenterYWorld = mean(fixedRefObj.YWorldLimits);
-movingCenterXWorld = mean(movingRefObj.XWorldLimits);
-movingCenterYWorld = mean(movingRefObj.YWorldLimits);
-translationX = fixedCenterXWorld - movingCenterXWorld;
-translationY = fixedCenterYWorld - movingCenterYWorld;
+% Determine initial transformation
+% Use MOVINGREG transformation if provided, otherwise use center alignment
+if nargin >= 3 && ~isempty(MOVINGREG) && isfield(MOVINGREG,'Transformation') && ~isempty(MOVINGREG.Transformation)
+    % Use transformation from phase correlation as starting point
+    initTform = MOVINGREG.Transformation;
+else
+    % Align centers (fallback if MOVINGREG not provided)
+    fixedCenterXWorld = mean(fixedRefObj.XWorldLimits);
+    fixedCenterYWorld = mean(fixedRefObj.YWorldLimits);
+    movingCenterXWorld = mean(movingRefObj.XWorldLimits);
+    movingCenterYWorld = mean(movingRefObj.YWorldLimits);
+    translationX = fixedCenterXWorld - movingCenterXWorld;
+    translationY = fixedCenterYWorld - movingCenterYWorld;
+    
+    % Coarse alignment
+    initTform = affinetform2d();
+    initTform.A(1:2,3) = [translationX ; translationY];
+end
 
-% Coarse alignment
-initTform = affinetform2d();
-initTform.A(1:2,3) = [translationX ; translationY];
-
-% Apply transformation
-tform = imregtform(MOVING,movingRefObj,FIXED,fixedRefObj,'rigid',optimizer,metric,'PyramidLevels',3,'InitialTransformation',initTform);
+% Apply transformation with optional weights
+if nargin >= 4 && ~isempty(WEIGHTS)
+    % Use weights for registration
+    tform = imregtform(MOVING,movingRefObj,FIXED,fixedRefObj,'rigid',optimizer,metric,'PyramidLevels',3,'InitialTransformation',initTform,'Weights',WEIGHTS);
+else
+    % Registration without weights
+    tform = imregtform(MOVING,movingRefObj,FIXED,fixedRefObj,'rigid',optimizer,metric,'PyramidLevels',3,'InitialTransformation',initTform);
+end
 MOVINGREG.Transformation = tform;
 MOVINGREG.RegisteredImage = imwarp(MOVING, movingRefObj, tform, 'OutputView', fixedRefObj, 'SmoothEdges', true, 'Interp', 'cubic');
 
