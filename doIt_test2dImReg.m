@@ -82,7 +82,7 @@ projectStorage
 projectScratch
 
 
-return
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -97,43 +97,115 @@ fMaskInv = fullfile(projectScratch,[b '_mask.nii.gz']);
 copyfile(dataFile   ,fRun0   );
 copyfile(dataMaskInv,fMaskInv);
 
+
+
 % gold-standard registration
-% fBase0 = replace(fRun0,'.nii.gz','_base.nii.gz');
-mriMask = MRIread(fMaskInv);
-mri     = MRIread(fRun0);
-im0 = squeeze(mri.vol);
+mri = MRIread(fRun0);
+im0 = squeeze(mri.vol(:,:,:,11:end));
 im0 = im0 - min(im0(:));
 im0 = im0./max(im0(:));
-im0Base = mean(im0(:,:,10:60),3).*-(mriMask.vol-1);
-im0Base = mean(im0(:,:,10:60),3);
-im0 = im0(:,:,1:60);
-
-% MRIwrite(mri,fBase0);
+im0Base = mean(im0(:,:,1:49),3);
 for i = 1:size(im0,3)
     disp(['image ' num2str(i) '/' num2str(size(im0,3))])
     im0_regPhaseCorr(i) = registerImages_phaseCorrelation(im0(:,:,i),im0Base);
-    im0_regMono(i)      = registerImages_monomodal(im0(:,:,i),im0Base,im0_regPhaseCorr_regPhaseCorr(i),-(mriMask.vol-1));
+    im0_regMono(i)      = registerImages_monomodal(im0(:,:,i),im0Base,im0_regPhaseCorr(i));
 end
-[dispField,im0_regGroupwise] = imreggroupwise(im0,'GridSpacing',[25 25]);
+
+mri = MRIread(fRun0);
+im0 = squeeze(mri.vol(:,:,:,11:end));
+im0 = im0 - min(im0(:));
+im0 = im0./max(im0(:));
+im0Base = mean(im0(:,:,1:49),3);
+mriMask = MRIread(fMaskInv);
+im0 = im0.*-(mriMask.vol-1);
+for i = 1:size(im0,3)
+    disp(['image ' num2str(i) '/' num2str(size(im0,3))])
+    im0_regPhaseCorr_movMasked(i)  = registerImages_phaseCorrelation(im0(:,:,i),im0Base);
+    im0_regMonoMasked_movMasked(i) = registerImages_monomodal(im0(:,:,i),im0Base,im0_regPhaseCorr_movMasked(i));
+end
+
+mri = MRIread(fRun0);
+im0 = squeeze(mri.vol(:,:,:,11:end));
+im0 = im0 - min(im0(:));
+im0 = im0./max(im0(:));
+im0Base = mean(im0(:,:,1:49),3);
+mriMask = MRIread(fMaskInv);
+im0Base = im0Base.*-(mriMask.vol-1);
+for i = 1:size(im0,3)
+    disp(['image ' num2str(i) '/' num2str(size(im0,3))])
+    im0_regPhaseCorr_fixMasked(i)  = registerImages_phaseCorrelation(im0(:,:,i),im0Base);
+    im0_regMonoMasked_fixMasked(i) = registerImages_monomodal(im0(:,:,i),im0Base,im0_regPhaseCorr_fixMasked(i));
+end
+
+mri = MRIread(fRun0);
+im0 = squeeze(mri.vol(:,:,:,11:end));
+im0 = im0 - min(im0(:));
+im0 = im0./max(im0(:));
+[dispField,im0_regGroupwise] = imreggroupwise(im0,'GridSpacing',[50 50]);
+
+save tmp -v7.3;
+
+return
 
 
-fRun_regMono = replace(fRun0,'.nii.gz','_regMono.nii.gz');
-mri.vol = cat(4,im0_regMono.RegisteredImage);
-MRIwrite(mri,fRun_regMono);
-fRun_regPhaseCorr = replace(fRun0,'.nii.gz','_regPhaseCorr.nii.gz');
-mri.vol = cat(4,im0_regPhaseCorr.RegisteredImage);
-MRIwrite(mri,fRun_regPhaseCorr);
-fRun_regGroupwise = replace(fRun0,'.nii.gz','_regGroupwise.nii.gz');
-mri.vol = permute(im0_regGroupwise,[1 2 4 3]);
-MRIwrite(mri,fRun_regGroupwise);
+rho0              = imCorr(      im0                                         ,mriMask.vol);
+rhoMono           = imCorr(cat(3,im0_regMono.RegisteredImage                ),mriMask.vol);
+rhoMonoMasked_mov = imCorr(cat(3,im0_regMonoMasked_movMasked.RegisteredImage),mriMask.vol);
+rhoMonoMasked_fix = imCorr(cat(3,im0_regMonoMasked_fixMasked.RegisteredImage),mriMask.vol);
+rhoGroupwise      = imCorr(      im0_regGroupwise                            ,mriMask.vol);
 
-imCorr(fRun_regMono,fMaskInv);
-imCorr(fRun_regPhaseCorr,fMaskInv);
-imCorr(fRun_regGroupwise,fMaskInv);
+rho0(             diag(true(size(rho0,1),1))             ) = nan;
+rhoMono(          diag(true(size(rhoMono,1),1))          ) = nan;
+rhoMonoMasked_mov(diag(true(size(rhoMonoMasked_mov,1),1))) = nan;
+rhoMonoMasked_fix(diag(true(size(rhoMonoMasked_fix,1),1))) = nan;
+rhoGroupwise(     diag(true(size(rhoGroupwise,1),1))     ) = nan;
+
+hFig = figure('Menu','none','ToolBar','none');
+plot(mean(rho0             ,2,'omitnan')); hold on;
+plot(mean(rhoMono          ,2,'omitnan')); hold on;
+plot(mean(rhoMonoMasked_mov,2,'omitnan')); hold on;
+plot(mean(rhoMonoMasked_fix,2,'omitnan')); hold on;
+plot(mean(rhoGroupwise     ,2,'omitnan')); hold on;
+legend('Original','Monomodal Reg','Monomodal Reg (mov masked)','Monomodal Reg (fix masked)','Groupwise Reg','interpreter','none');
+ylim([0 1]);
 
 
+hFig = figure('Name','Mean images','Menu','none','ToolBar','none');
+tgroup = uitabgroup(hFig);
 
-[dispField,im0_regGroupwise] = imreggroupwise(im0,'GridSpacing',[25 25]);
+t1 = uitab(tgroup, 'Title', 'Original');
+axes1 = axes('Parent', t1);
+imagesc(mean(im0                                               ,3), 'Parent', axes1,[0 0.7]); axis image off; colormap gray;
+title(axes1,'Original');
+
+t2 = uitab(tgroup, 'Title', 'Monomodal Reg');
+axes2 = axes('Parent', t2);
+imagesc(mean(cat(3,im0_regMono.RegisteredImage                ),3), 'Parent', axes2,[0 0.7]); axis image off; colormap gray;
+title(axes2,'Monomodal Reg');
+
+t3 = uitab(tgroup, 'Title', 'Monomodal Reg (mov masked)');
+axes3 = axes('Parent', t3);
+imagesc(mean(cat(3,im0_regMonoMasked_movMasked.RegisteredImage),3), 'Parent', axes3,[0 0.7]); axis image off; colormap gray;
+title(axes3,'Monomodal Reg (mov masked)');
+
+t4 = uitab(tgroup, 'Title', 'Monomodal Reg (fix masked)');
+axes4 = axes('Parent', t4);
+imagesc(mean(cat(3,im0_regMonoMasked_fixMasked.RegisteredImage),3), 'Parent', axes4,[0 0.7]); axis image off; colormap gray;
+title(axes4,'Monomodal Reg (fix masked)');
+
+t5 = uitab(tgroup, 'Title', 'Groupwise Reg');
+axes5 = axes('Parent', t5);
+imagesc(mean(im0_regGroupwise                                  ,3), 'Parent', axes5,[0 0.7]); axis image off; colormap gray;
+title(axes5,'Groupwise Reg');
+
+implay(im0_regGroupwise);
+
+
+implay(squeeze(dispField(:,:,1,:)));
+implay(cat(3,im0_regMono.RegisteredImage));
+implay(im0_regGroupwise);
+
+
 
 
 
@@ -149,13 +221,10 @@ imCorr(fRun0     ,fMaskInv)
 imCorr(fRun_ImReg,fMaskInv)
 
 
-% mri = MRIread(fRun0);
-% im = squeeze(single(mri.vol));
-% im = im - min(im(:));
-% im = im./max(im(:));
-% im = im + randn(size(im))*0.01;
-% mri.vol = single(im);
-% MRIwrite(mri,fRun0);
+
+
+
+
 
 
 

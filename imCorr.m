@@ -12,7 +12,11 @@ function rho = imCorr(fRun,fMaskE)
         rho = corr(permute(im(:,imMask),[2 1]));
     else
         im = permute(fRun,[3 1 2]);
-        rho = corr(permute(im(:,:),[2 1]));
+        if exist('fMaskE','var') && ~isempty(fMaskE)
+            rho = corr(permute(im(:,logical(-(fMaskE-1))),[2 1]));
+        else
+            rho = corr(permute(im(:,:),[2 1]));
+        end
     end
 
 
