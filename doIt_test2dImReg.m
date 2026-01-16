@@ -84,15 +84,31 @@ projectScratch
 
 return
 
-% get data and mask
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Generate noisy test data
 dir(fullfile(projectStorage,'..','sampleData','*.nii.gz'));
 dataFile    = fullfile(projectStorage,'..','sampleData','vfMRIsample01.nii.gz');
 dataMaskInv = fullfile(projectStorage,'..','sampleData','vfMRIsample01_brainMask.nii.gz');
+
+mri = MRIread(dataFile);
+
+im = squeeze(single(mri.vol));
+im = im - min(im(:));
+im = im./max(im(:));
+im = im + randn(size(im))*0.01;
+mri.vol = single(im);
+MRIwrite(mri,dataFile);
+
+
+
 [~,b,~] = fileparts(replace(dataFile,'.nii.gz',''));
 fRun0    = fullfile(projectScratch,[b '.nii.gz']);
 fMaskInv = fullfile(projectScratch,[b '_mask.nii.gz']);
 copyfile(dataFile   ,fRun0   );
 copyfile(dataMaskInv,fMaskInv);
+
+
 
 %% Test matlab functions
 % GUI
