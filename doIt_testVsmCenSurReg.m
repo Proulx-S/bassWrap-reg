@@ -77,19 +77,82 @@ switch envId
         % end
 end
 %% %%%%%%%%%%%%%%%%%%
-projectCode
-projectStorage
-projectScratch
-
+disp(projectCode)
+disp(projectStorage)
+disp(projectScratch)
 
 %%%%%%%%%%%%%%%%%%
 %% Copy data files
 %%%%%%%%%%%%%%%%%%
 % get data pointer
-cp ../../vsmCenSur/dataPointers.mat ./sampleData/
-load(fullfile(projectCode,'..','sampleData','dataPointers.mat'));
-roi
+pointerFile = fullfile(projectCode,'tmp','dataPointers.mat');
+copyfile('/scratch/users/Proulx-S/vsmCenSur/dataPointers.mat',pointerFile);
+load(pointerFile);
+s = 1; % perferct all over
+s = 2; % somewhate rigid movement mostly in the first and 2nd run -> mostly correctable with matlab registration over vesselRegion, but frames failed (will probably require temporal smoothing)
+s = 3; % ok
+s = 4; % minimal possibly non-rigid movement
+s = 5; % some non-rigid movement particularly in one vessel on the left on the last run
+s = 6; % ok
+s = 7; % some movements, not clear if rigid
 
+return
+
+S=2;
+im0 = squeeze(cat(5,roi{S}.(acq).(task).vesselRegion.im.ts.im{:}));
+im0 = im0 - min(im0(:));
+im0 = im0./max(im0(:));
+im0Base = mean(im0,[3 4]);
+clear im0_reg im0_regParam
+for i = 1:3%size(im0,4)
+    disp(['RUN ' num2str(i) '/' num2str(size(im0,4))])
+    for j = 1:size(im0,3)
+        if j==1 || mod(j,10)==0 || j==size(im0,3)
+            disp(['frame ' num2str(j) '/' num2str(size(im0,3))])
+        end
+        im0_regTmp = registerImages_phaseCorrelation(im0(:,:,j,i),im0Base           );
+        im0_regTmp = registerImages_monomodal(       im0(:,:,j,i),im0Base,im0_regTmp);
+        im0_reg(:,:,j,i) = im0_regTmp.RegisteredImage;
+        im0_regParam(j,i) = im0_regTmp.Transformation;
+    end
+end
+whos im0 im0_reg
+
+regParams = cat(1,im0_regParam.Translation);
+regParams = cat(2,regParams,cat(1,im0_regParam.RotationAngle));
+
+figure('Menu','none','ToolBar','none');
+plot(regParams);
+return
+
+sz = size(im0); sz(3) = 1;
+im0 = cat(3,im0,repmat(0.5,sz));
+sz = size(im0_reg); sz(3) = 1;
+im0_reg = cat(3,im0_reg,repmat(0.5,sz));
+
+
+COM = cat(1,roi{S}.(acq).(task).vesselRegion.com{:}); COM = COM - [roi{S}.(acq).(task).vesselRegion.cropXlim(1) roi{S}.(acq).(task).vesselRegion.cropYlim(1)] + 1;
+for c = 1:size(COM,1)
+    im0(    round(COM(c,2)),round(COM(c,1)),:,:) = 0;
+    im0_reg(round(COM(c,2)),round(COM(c,1)),:,:) = 0;
+end
+
+
+tmp = im0(:,:,[1:20 end-20:end],1:3); sz = size(tmp); sz(3:4) = [prod(sz(3:4)) 1];
+implay(reshape(uint8(tmp.*255),sz));
+tmp = im0_reg(:,:,[1:20 end-20:end],:); sz = size(tmp); sz(3:4) = [prod(sz(3:4)) 1];
+implay(reshape(uint8(tmp.*255),sz));
+
+tmp = im0(:,:,:,1:3);
+im0_xMat = imCorr(tmp(:,:,:));
+tmp = im0_reg(:,:,:,1:3);
+im0_reg_xMat = imCorr(tmp(:,:,:));
+
+hFig = figure('Menu','none','ToolBar','none');
+plot(mean(im0_xMat.^2,2)); hold on;
+plot(mean(im0_reg_xMat.^2,2));
+legend('Original','Registered');
+ylim([0 1]);
 
 
 %% %%%%%%%%%%%%%%%
