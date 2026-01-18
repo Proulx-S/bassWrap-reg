@@ -57,6 +57,10 @@ switch envId
         %%%% afni
         src.afni = 'ml afni/24.3.00';
         system([src.afni '; 3dinfo > /dev/null'],'-echo');
+        %%%% vesselboost
+        src.vesselboost = 'ml vesselboost/1.0.0';
+        system([src.vesselboost '; prediction.py --help > /dev/null'],'-echo');
+        
         % %%%% ants
         % src.ants = 'ml ants/2.5.3';
         % system([src.ants '; antsRegistration --version > /dev/null'],'-echo');
@@ -81,12 +85,14 @@ disp(projectCode)
 disp(projectStorage)
 disp(projectScratch)
 
+
+
 %%%%%%%%%%%%%%%%%%
 %% Copy data files
 %%%%%%%%%%%%%%%%%%
 % get data pointer
 pointerFile = fullfile(projectCode,'tmp','dataPointers.mat');
-copyfile('/scratch/users/Proulx-S/vsmCenSur/dataPointers.mat',pointerFile);
+% copyfile('/scratch/users/Proulx-S/vsmCenSur/dataPointers.mat',pointerFile);
 load(pointerFile);
 s = 1; % perferct all over
 s = 2; % somewhate rigid movement mostly in the first and 2nd run -> mostly correctable with matlab registration over vesselRegion, but frames failed (will probably require temporal smoothing)
@@ -95,10 +101,41 @@ s = 4; % minimal possibly non-rigid movement
 s = 5; % some non-rigid movement particularly in one vessel on the left on the last run
 s = 6; % ok
 s = 7; % some movements, not clear if rigid
-
+%% %%%%%%%%%%%%%%%
 return
 
+
 S=2;
+tmp = fullfile(roi{S}.(acq).(task).rCond.volAnat.tof.folder,roi{S}.(acq).(task).rCond.volAnat.tof.name);
+tmpDir = fullfile(projectCode,'tmp','tof','seg'); if ~exist(tmpDir,'dir'); mkdir(tmpDir); end
+tmpDir = fullfile(projectCode,'tmp','tof','raw'); if ~exist(tmpDir,'dir'); mkdir(tmpDir); end
+tof = fullfile(tmpDir,'tof.nii.gz');
+copyfile(tmp,tof);
+
+in    = fileparts(tof);
+out   = fullfile(in,'..','seg');
+model = fullfile(projectCode,'tmp','tof','models','manual_0429');
+vesselboost_prediction(in,out,model,4);
+
+cmd = {src.vesselboost};
+cmd{end+1} = 'prediction.py \';
+cmd{end+1} = '--ds_path /scratch/users/Proulx-S/tools/bassWrap-reg/testVsmCenSurReg/tmp/tof/raw/ \';
+cmd{end+1} = '--out_path /scratch/users/Proulx-S/tools/bassWrap-reg/testVsmCenSurReg/tmp/tof/seg/ \';
+cmd{end+1} = '--pretrained /scratch/users/Proulx-S/tools/bassWrap-reg/testVsmCenSurReg/saved_models/manual_0429 \';
+cmd{end+1} = '--prep_mode 4';
+system(strjoin(cmd,newline),'-echo');
+
+
+% ml vesselboost
+% prediction.py --ds_path /scratch/users/Proulx-S/tools/bassWrap-reg/testVsmCenSurReg/tmp/tof/raw/ --out_path /scratch/users/Proulx-S/tools/bassWrap-reg/testVsmCenSurReg/tmp/tof/seg/ --pretrained /scratch/users/Proulx-S/tools/bassWrap-reg/testVsmCenSurReg/saved_models/manual_0429 --prep_mode 4
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Try matlab registration
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+S=2;
+roi{S}.(acq).(task);
 im0 = squeeze(cat(5,roi{S}.(acq).(task).vesselRegion.im.ts.im{:}));
 im0 = im0 - min(im0(:));
 im0 = im0./max(im0(:));
@@ -154,8 +191,8 @@ plot(mean(im0_reg_xMat.^2,2));
 legend('Original','Registered');
 ylim([0 1]);
 
+%% %%%%%%%%%%%%%%%%%%%%%%%
 
-%% %%%%%%%%%%%%%%%
 
 
 return
