@@ -117,13 +117,11 @@ out   = fullfile(in,'..','seg');
 model = fullfile(projectCode,'tmp','tof','models','manual_0429');
 vesselboost_prediction(in,out,model,4);
 
-cmd = {src.vesselboost};
-cmd{end+1} = 'prediction.py \';
-cmd{end+1} = '--ds_path /scratch/users/Proulx-S/tools/bassWrap-reg/testVsmCenSurReg/tmp/tof/raw/ \';
-cmd{end+1} = '--out_path /scratch/users/Proulx-S/tools/bassWrap-reg/testVsmCenSurReg/tmp/tof/seg/ \';
-cmd{end+1} = '--pretrained /scratch/users/Proulx-S/tools/bassWrap-reg/testVsmCenSurReg/saved_models/manual_0429 \';
-cmd{end+1} = '--prep_mode 4';
-system(strjoin(cmd,newline),'-echo');
+
+tof_seg = MRIread(fullfile(out,'tof.nii.gz'));
+figure('Menu','none','ToolBar','none');
+imagesc(tof_seg.vol(:,:,round(end/2),1));
+bwskel(tof_seg.vol)
 
 
 % ml vesselboost
