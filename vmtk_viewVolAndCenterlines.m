@@ -1,4 +1,4 @@
-function vmtk_viewVolAndCenterlines(volume_nii, centerlines_vtk, printFlag)
+function cmd = vmtk_viewVolAndCenterlines(volume_nii, centerlines_vtk, printFlag)
     % VMTK_VIEW_VOLUME_CENTERLINES Visualize volume image and centerlines together in a single VMTK window
     %
     % Usage:

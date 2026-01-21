@@ -1,4 +1,4 @@
-function vmtk_centerlinesFromSurf(surface_vtk, output_centerlines_vtk, source_point, target_point, printFlag)
+function cmd = vmtk_centerlinesFromSurf(surface_vtk, output_centerlines_vtk, source_point, target_point, printFlag)
     % VMTK_CENTERLINESFROMSURF Extract centerlines from surface mesh using VMTK
     %
     % Usage:
