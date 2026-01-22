@@ -1,19 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-skeleton_to_graph_vtk.py
+skan_skeletonMask_to_vtk.py
 
-Extract full graph structure (nodes and edges) from skeleton mask and output
+Extract vessel network graph from skeleton mask using skan library and output
 as VTK PolyData centerline format compatible with vmtkcenterlines.
 
-This script builds a graph where each skeleton voxel is a node and edges
-connect adjacent voxels, preserving branching structure.
+This script uses skan's skeleton_to_csgraph to extract graph structure from
+skeleton masks, which handles junctions and branching more robustly than
+manual neighbor checking.
 
 Usage:
-    python skeleton_to_graph_vtk.py <input_skeleton_nii> <output_vtk> [--connectivity 26]
+    python skan_skeletonMask_to_vtk.py <input_skeleton_nii> <output_vtk> [--coordinate-system xyz]
 """
 
 from __future__ import print_function
+import skan
 import sys
 import os
 import argparse
@@ -24,6 +26,19 @@ try:
 except ImportError:
     print('Error: nibabel is required. Install with: pip install nibabel', file=sys.stderr)
     print('Or use a Neurodesk container with nibabel (e.g., nipype/1.8.3)', file=sys.stderr)
+    sys.exit(1)
+
+try:
+    from skan.csr import skeleton_to_csgraph
+except ImportError:
+    print('Error: skan is required. Install with: pip install skan', file=sys.stderr)
+    print('Or use a Neurodesk container with skan (e.g., nipype/1.8.3)', file=sys.stderr)
+    sys.exit(1)
+
+try:
+    from scipy.sparse import csr_matrix
+except ImportError:
+    print('Error: scipy is required. Install with: pip install scipy', file=sys.stderr)
     sys.exit(1)
 
 try:
@@ -39,7 +54,7 @@ def voxel_to_ras_coords(voxel_coords, affine):
     """Convert voxel coordinates to RAS coordinates using NIfTI affine matrix.
     
     Args:
-        voxel_coords: Nx3 array of voxel coordinates (0-based)
+        voxel_coords: Nx3 array of voxel coordinates (0-based, may be non-integer)
         affine: 4x4 affine transformation matrix from NIfTI header
     
     Returns:
@@ -64,7 +79,7 @@ def voxel_to_xyz_coords(voxel_coords, affine):
     This is the coordinate system that vmtkcenterlines expects for centerlines.
     
     Args:
-        voxel_coords: Nx3 array of voxel coordinates (0-based)
+        voxel_coords: Nx3 array of voxel coordinates (0-based, may be non-integer)
         affine: 4x4 affine transformation matrix from NIfTI header
     
     Returns:
@@ -84,89 +99,42 @@ def voxel_to_xyz_coords(voxel_coords, affine):
     return xyz_coords
 
 
-def build_graph_from_skeleton(skeleton_data, connectivity=26):
-    """Build graph from skeleton where each non-zero voxel is a node.
+def csr_to_edges(csr_graph):
+    """Convert CSR sparse matrix to list of edge tuples.
     
     Args:
-        skeleton_data: 3D binary array (skeleton mask)
-        connectivity: 6, 18, or 26 (default: 26 for 3D)
+        csr_graph: scipy.sparse.csr_matrix representing adjacency graph
     
     Returns:
-        nodes: Nx3 array of voxel coordinates (0-based)
-        edges: List of edge tuples (node_idx1, node_idx2)
+        List of edge tuples (node_idx1, node_idx2) where node_idx1 < node_idx2
     """
-    # Find all non-zero voxel coordinates
-    coords = np.argwhere(skeleton_data > 0)
-    n_nodes = len(coords)
-    
-    if n_nodes == 0:
-        return np.array([]), []
-    
-    # Create mapping from coordinate to node index
-    coord_to_idx = {}
-    for idx, coord in enumerate(coords):
-        coord_to_idx[tuple(coord)] = idx
-    
-    # Define neighbors based on connectivity
-    if connectivity == 6:
-        # 6-connectivity: face neighbors only
-        offsets = [
-            (-1, 0, 0), (1, 0, 0),
-            (0, -1, 0), (0, 1, 0),
-            (0, 0, -1), (0, 0, 1)
-        ]
-    elif connectivity == 18:
-        # 18-connectivity: face + edge neighbors
-        offsets = [
-            (-1, 0, 0), (1, 0, 0),
-            (0, -1, 0), (0, 1, 0),
-            (0, 0, -1), (0, 0, 1),
-            (-1, -1, 0), (-1, 1, 0), (1, -1, 0), (1, 1, 0),
-            (-1, 0, -1), (-1, 0, 1), (1, 0, -1), (1, 0, 1),
-            (0, -1, -1), (0, -1, 1), (0, 1, -1), (0, 1, 1)
-        ]
-    else:  # connectivity == 26
-        # 26-connectivity: all neighbors (face + edge + corner)
-        offsets = []
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                for dz in [-1, 0, 1]:
-                    if (dx, dy, dz) != (0, 0, 0):
-                        offsets.append((dx, dy, dz))
-    
-    # Build edges by checking neighbors
     edges = []
-    shape = skeleton_data.shape
+    # Iterate through non-zero entries in CSR matrix
+    for i in range(csr_graph.shape[0]):
+        # Get indices of non-zero entries in row i
+        row_start = csr_graph.indptr[i]
+        row_end = csr_graph.indptr[i + 1]
+        for j in range(row_start, row_end):
+            col_idx = csr_graph.indices[j]
+            # Only add edge once (with smaller index first)
+            if i < col_idx:
+                edges.append((i, col_idx))
     
-    for idx, coord in enumerate(coords):
-        x, y, z = coord
-        for dx, dy, dz in offsets:
-            nx, ny, nz = x + dx, y + dy, z + dz
-            
-            # Check bounds
-            if (0 <= nx < shape[0] and 0 <= ny < shape[1] and 0 <= nz < shape[2]):
-                neighbor_coord = (nx, ny, nz)
-                if neighbor_coord in coord_to_idx:
-                    neighbor_idx = coord_to_idx[neighbor_coord]
-                    # Add edge (only once, with smaller index first)
-                    if idx < neighbor_idx:
-                        edges.append((idx, neighbor_idx))
-    
-    return coords, edges
+    return edges
 
 
-def graph_to_vtk_polydata(nodes_ras, edges, output_path):
+def graph_to_vtk_polydata(nodes_coords, edges, output_path):
     """Convert graph (nodes and edges) to VTK PolyData format.
     
     Args:
-        nodes_ras: Nx3 array of RAS coordinates
+        nodes_coords: Nx3 array of coordinates (RAS or xyz)
         edges: List of edge tuples (node_idx1, node_idx2)
         output_path: Path to output VTK file
     """
     
     # Create points
     points = vtk.vtkPoints()
-    for node in nodes_ras:
+    for node in nodes_coords:
         points.InsertNextPoint(node[0], node[1], node[2])
     
     # Create lines (each edge becomes a line segment)
@@ -194,19 +162,12 @@ def graph_to_vtk_polydata(nodes_ras, edges, output_path):
     writer.Write()
 
 
-
-
 def main():
     parser = argparse.ArgumentParser(
-        description='Extract graph from skeleton mask and output as VTK centerline'
+        description='Extract graph from skeleton mask using skan and output as VTK centerline'
     )
     parser.add_argument('input_nii', help='Input skeleton NIfTI file (binary mask)')
     parser.add_argument('output_vtk', help='Output VTK PolyData file (.vtk or .vtp)')
-    parser.add_argument(
-        '--connectivity', type=int, default=26,
-        choices=[6, 18, 26],
-        help='Voxel connectivity (6, 18, or 26, default: 26)'
-    )
     parser.add_argument(
         '--coordinate-system', type=str, default='xyz',
         choices=['ras', 'xyz'],
@@ -226,7 +187,7 @@ def main():
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
-    # Build graph from skeleton
+    # Load skeleton
     print('Loading skeleton from: %s' % args.input_nii)
     nii = nib.load(args.input_nii)
     skeleton_data = nii.get_fdata()
@@ -246,26 +207,32 @@ def main():
         print('Error: Skeleton mask is empty', file=sys.stderr)
         sys.exit(1)
     
-    # Build graph from skeleton
-    print('Building graph from skeleton (connectivity=%d)...' % args.connectivity)
-    nodes_voxel, edges = build_graph_from_skeleton(skeleton_data, args.connectivity)
+    # Extract graph using skan
+    print('Extracting graph using skan...')
+    pixel_graph, coordinates = skeleton_to_csgraph(skeleton_data)
     
-    if len(nodes_voxel) == 0:
+    if pixel_graph.shape[0] == 0:
         print('Error: No nodes found in skeleton', file=sys.stderr)
         sys.exit(1)
     
-    print('Graph: %d nodes, %d edges' % (len(nodes_voxel), len(edges)))
+    print('Skan graph: %d nodes' % pixel_graph.shape[0])
     
-    # Convert voxel coordinates to output coordinate system
+    # Convert CSR matrix to edge list
+    print('Converting CSR graph to edge list...')
+    edges = csr_to_edges(pixel_graph)
+    print('Graph: %d nodes, %d edges' % (pixel_graph.shape[0], len(edges)))
+    
+    # Convert coordinates to output coordinate system
+    # Note: skan's coordinates may be non-integer due to junction collapsing
     if args.coordinate_system == 'xyz':
         # Use xyz space (vmtk physical space) to match vmtkcenterlines output
         print('Converting voxel coordinates to xyz space (vmtk physical space)...')
-        nodes_coords = voxel_to_xyz_coords(nodes_voxel, affine)
+        nodes_coords = voxel_to_xyz_coords(coordinates, affine)
         coord_system_name = 'xyz'
     else:
         # Use RAS space (standard NIfTI coordinate system)
         print('Converting voxel coordinates to RAS space...')
-        nodes_coords = voxel_to_ras_coords(nodes_voxel, affine)
+        nodes_coords = voxel_to_ras_coords(coordinates, affine)
         coord_system_name = 'RAS'
     
     # Write VTK file

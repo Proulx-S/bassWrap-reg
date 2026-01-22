@@ -1,20 +1,16 @@
-function output_vtk = skeleton_to_graph_vtk(skeleton_nii, output_vtk, connectivity, forceThis, reference_nii)
+function output_vtk = skeleton_to_graph_vtk(skeleton_nii, output_vtk, connectivity, forceThis)
 %SKELETON_TO_GRAPH_VTK Extract graph from skeleton mask and output as VTK centerline
 %
 %   Usage:
 %     output_vtk = skeleton_to_graph_vtk(skeleton_nii, output_vtk)
 %     output_vtk = skeleton_to_graph_vtk(skeleton_nii, output_vtk, connectivity)
 %     output_vtk = skeleton_to_graph_vtk(skeleton_nii, output_vtk, connectivity, forceThis)
-%     output_vtk = skeleton_to_graph_vtk(skeleton_nii, output_vtk, connectivity, forceThis, reference_nii)
 %
 %   Inputs:
 %     skeleton_nii - Path to input skeleton NIfTI file (binary mask)
 %     output_vtk   - Path to output VTK PolyData file (.vtk or .vtp)
 %     connectivity - Optional: 6, 18, or 26 (default: 26 for 3D)
 %     forceThis    - Optional: if true, regenerate even if output exists (default: false)
-%     reference_nii - Optional: Path to reference NIfTI file to use for affine
-%                     transformation (e.g., original TOF volume). If not provided,
-%                     uses the input skeleton file's affine.
 %
 %   Outputs:
 %     output_vtk   - Path to created VTK PolyData file
@@ -59,16 +55,11 @@ function output_vtk = skeleton_to_graph_vtk(skeleton_nii, output_vtk, connectivi
         error('skeleton_to_graph_vtk:ScriptNotFound', 'Python script not found: %s', python_script);
     end
 
-    % Build command with optional reference volume
+    % Build command
     % Use xyz coordinate system by default to match vmtkcenterlines output
     % This ensures centerlines align properly when viewed with vmtk_viewVolAndSurf
-    if nargin >= 5 && ~isempty(reference_nii) && exist(reference_nii, 'file')
-        cmd = sprintf('python "%s" "%s" "%s" --connectivity %d --reference-nii "%s" --coordinate-system xyz', ...
-            python_script, skeleton_nii, output_vtk, connectivity, reference_nii);
-    else
-        cmd = sprintf('python "%s" "%s" "%s" --connectivity %d --coordinate-system xyz', ...
-            python_script, skeleton_nii, output_vtk, connectivity);
-    end
+    cmd = sprintf('python "%s" "%s" "%s" --connectivity %d --coordinate-system xyz', ...
+        python_script, skeleton_nii, output_vtk, connectivity);
     
     % Try to use nipype container if available (check for global src.nipype)
     global src;
