@@ -25,9 +25,9 @@ function centerline_vtk = slicer_centerline_from_mask(mask_nii, output_vtk, opti
 %                     fullTree = true.
 %       .numPoints  - Number of skeleton points (default: 100)
 %       .useXvfb    - On Linux, prepend xvfb-run for headless when no DISPLAY (default: false)
-%       .slicerOutputCoordinates - 'lps' (default) or 'ras'. Slicer writes points in LPS;
-%         'lps' converts to RAS for VTK so centerlines align with NIfTI/vmtkimagereader.
-%         Set 'ras' to disable conversion if centerlines are misaligned.
+%       .slicerOutputCoordinates - 'ras' (default) or 'lps'. ExtractSkeleton outputs in
+%         the volume's coordinate system (typically RAS). Use 'ras' for no conversion.
+%         If centerlines are misaligned, try 'lps' to apply LPS→RAS conversion.
 %
 %   Slicer path resolution order (same style as src.vmtk in doIt.m):
 %     1) global src.slicer
@@ -54,7 +54,7 @@ function centerline_vtk = slicer_centerline_from_mask(mask_nii, output_vtk, opti
     if ~isfield(options, 'fullTree');   options.fullTree   = false; end
     if ~isfield(options, 'numPoints');  options.numPoints  = 100;   end
     if ~isfield(options, 'useXvfb');    options.useXvfb    = false; end  % set true only if xvfb-run installed and no DISPLAY
-    if ~isfield(options, 'slicerOutputCoordinates'); options.slicerOutputCoordinates = 'lps'; end
+    if ~isfield(options, 'slicerOutputCoordinates'); options.slicerOutputCoordinates = 'ras'; end
 
     if ~exist(mask_nii, 'file')
         error('slicer_centerline_from_mask:InputNotFound', 'Mask file not found: %s', mask_nii);

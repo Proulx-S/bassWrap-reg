@@ -22,9 +22,9 @@ Arguments:
   OUTPUT_VTK  : Output VTK PolyData file (.vtk or .vtp)
   --fullTree  : (optional) Include full skeleton tree; default: maximal center only
   --numPoints : (optional) Number of skeleton points (default: 100)
-  --inCoordinates : (optional) 'lps' or 'ras'. Slicer writes points in LPS; use 'lps'
-    to convert to RAS for VTK (matches NIfTI/vmtkimagereader). Use 'ras' if no conversion.
-    Default: lps.
+  --inCoordinates : (optional) 'ras' (default) or 'lps'. ExtractSkeleton outputs in the
+    volume's coordinate system (typically RAS). Use 'ras' for no conversion. If centerlines
+    are misaligned, try 'lps' to apply LPS→RAS conversion.
 """
 
 from __future__ import print_function
@@ -39,23 +39,28 @@ def _parse_points_file(path):
     Skips empty lines and header-like lines.
     """
     points = []
-    with open(path, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            # Support both space- and comma-separated
-            parts = line.replace(',', ' ').split()
-            floats = []
-            for i, p in enumerate(parts):
-                if i >= 3:
-                    break
-                try:
-                    floats.append(float(p))
-                except ValueError:
-                    break
-            if len(floats) >= 3:
-                points.append(floats[:3])
+    try:
+        # Use latin-1 encoding (permissive, can read any byte sequence) to avoid Unicode errors
+        with open(path, 'r', encoding='latin-1', errors='replace') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                # Support both space- and comma-separated
+                parts = line.replace(',', ' ').split()
+                floats = []
+                for i, p in enumerate(parts):
+                    if i >= 3:
+                        break
+                    try:
+                        floats.append(float(p))
+                    except ValueError:
+                        break
+                if len(floats) >= 3:
+                    points.append(floats[:3])
+    except Exception as e:
+        print('Error reading points file %s: %s' % (path, e), file=sys.stderr)
+        raise
     return points
 
 
@@ -115,7 +120,7 @@ def main():
     output_vtk = os.path.abspath(args[1])
     full_tree = '--fullTree' in args
     num_points = 100
-    in_coords = 'lps'  # Slicer writes LPS; convert to RAS for VTK/NIfTI by default
+    in_coords = 'ras'  # ExtractSkeleton outputs in volume's coord system (typically RAS)
     i = 0
     while i < len(args):
         a = args[i]
