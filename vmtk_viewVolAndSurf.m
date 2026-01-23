@@ -3,13 +3,30 @@ function vmtk_viewVolAndSurf(volume_nii, surface_vtk, printFlag)
     %
     % Usage:
     %   vmtk_view_volume_surface(volume_nii, surface_vtk)
+    %   vmtk_view_volume_surface(volume_nii, surface_vtk, printFlag)
     %
     % Inputs:
     %   volume_nii  - Path to volume image file (NIfTI format)
     %   surface_vtk - Path to surface mesh file (VTK format)
+    %   printFlag   - Optional: if true, print command to file instead of executing (default: true)
     %
     % This function opens a single VMTK viewer window displaying both the
     % volume image planes and the surface mesh together.
+    %
+    % IMPORTANT: Coordinate System Alignment
+    % The VTK surface file includes coordinate system metadata in FieldData:
+    % - NIfTI_Affine: 4x4 transformation matrix from voxel to RAS coordinates
+    % - CoordinateSystem: Identifier (RAS or xyz)  
+    % - SourceNIfTI: Path to source NIfTI file
+    %
+    % However, VMTK command-line tools do NOT automatically read and use FieldData.
+    % The surface coordinates must be in the same coordinate system as what
+    % vmtkimagereader outputs for proper alignment.
+    %
+    % If surfaces don't align, check the coordinate system:
+    % - Use read_vtk_fielddata.py <surface_vtk> to view stored metadata
+    % - The surface should match the coordinate system that vmtkimagereader outputs
+    % - If RAS doesn't align, try using --coordinate-system xyz when creating the surface
     
     global src;
     
@@ -27,7 +44,28 @@ function vmtk_viewVolAndSurf(volume_nii, surface_vtk, printFlag)
         error('Surface file not found: %s', surface_vtk);
     end
     
-    % Build VMTK command using the pattern from vesselboost_prediction.m
+    % Build VMTK command
+    % 
+    % IMPORTANT: Coordinate system alignment
+    % vmtkimagereader reads NIfTI files and outputs image data in a coordinate system
+    % that depends on how ITK processes the NIfTI affine transformation. The surface
+    % coordinates must match this coordinate system for proper alignment.
+    %
+    % The VTK surface file now includes coordinate system metadata in FieldData:
+    % - NIfTI_Affine: 4x4 transformation matrix from voxel to RAS coordinates
+    % - CoordinateSystem: Identifier (RAS or xyz)
+    % - SourceNIfTI: Path to source NIfTI file
+    %
+    % However, VMTK command-line tools do NOT automatically read and use FieldData
+    % metadata. The surface coordinates must already be in the correct coordinate system
+    % that matches what vmtkimagereader outputs.
+    %
+    % If surfaces don't align, check:
+    % 1. What coordinate system does vmtkimagereader output? (typically RAS after ITK processing)
+    % 2. What coordinate system is the surface in? (check CoordinateSystem in FieldData)
+    % 3. Apply appropriate transformation to match coordinate systems
+    %
+    % To extract and view the metadata, use: read_vtk_fielddata.py <surface_vtk>
     cmd = {src.vmtk};
     cmd{end+1} = [         'vmtkimagereader -ifile ' volume_nii ' \'];
     cmd{end+1} = ['--pipe vmtksurfacereader -ifile ' surface_vtk ' \'];

@@ -85,7 +85,7 @@ def skeletonize_volume(input_nii, output_nii, method='zhang'):
 def main():
     parser = argparse.ArgumentParser(description='Skeletonize binary NIfTI volume using scikit-image')
     parser.add_argument('input_nii', help='Input binary NIfTI file')
-    parser.add_argument('output_nii', help='Output skeletonized NIfTI file')
+    parser.add_argument('output_nii', nargs='?', default=None, help='Output skeletonized NIfTI file (optional)')
     parser.add_argument('--method', choices=['zhang', 'lee'], default='zhang',
                         help='Skeletonization method (default: zhang, auto-switches to lee for 3D)')
 
@@ -95,6 +95,14 @@ def main():
         print('Error: Input file not found: %s' % args.input_nii, file=sys.stderr)
         sys.exit(1)
 
+    # If output_nii is not provided, create a temporary file
+    temp_file = None
+    if args.output_nii is None:
+        import tempfile
+        temp_fd, temp_file = tempfile.mkstemp(suffix='.nii.gz', prefix='skeleton_')
+        os.close(temp_fd)
+        args.output_nii = temp_file
+
     # Ensure output directory exists
     output_dir = os.path.dirname(args.output_nii)
     if output_dir and not os.path.exists(output_dir):
@@ -103,6 +111,9 @@ def main():
     try:
         skeletonize_volume(args.input_nii, args.output_nii, args.method)
     except Exception as e:
+        # Clean up temp file on error
+        if temp_file and os.path.exists(temp_file):
+            os.remove(temp_file)
         print('Error: %s' % str(e), file=sys.stderr)
         sys.exit(1)
 

@@ -20,8 +20,24 @@ function output_vtk = skeleton_to_graph_vtk(skeleton_nii, output_vtk, connectivi
 %   adjacent voxels. The output is in VTK PolyData format compatible with
 %   vmtkcenterlines, preserving branching structure.
 %
-%   The function attempts to use pi2 if available, but falls back to direct
-%   graph construction if pi2 is not available.
+%   The output VTK file includes coordinate system metadata in FieldData:
+%   - NIfTI_Affine: 4x4 transformation matrix from voxel to RAS coordinates
+%   - CoordinateSystem: Identifier of the coordinate system used (RAS or xyz)
+%   - SourceNIfTI: Path to the source NIfTI file
+%
+%   By default, coordinates are output in RAS space (standard NIfTI coordinate
+%   system). The transformation matrix is stored in FieldData to allow tools
+%   to properly handle coordinate system conversions.
+
+
+% Note for a potential alternative implementation:
+% (see http://www.vmtk.org/tutorials/WorkingWithNumpyArrays.html)
+%    0) vmtkimagereader to read nifti image data (vessel skeleton mask) to vtkImageData
+%    1) vmtkimagetonumpy to convert vtkImageData to numpy
+%    2) extract network from skeleton mask (custom implementation here)
+%    3) vmtknumpytocenterlines to write network to VTK PolyData format
+%    Might want to consider vmtksurfacetransformtoras as well.
+%    Also vmtkcenterlinemodeller could be use to confirm proper handling of coordinate system.
 
     if nargin < 3 || isempty(connectivity)
         connectivity = 26;  % Default: 26-connectivity for 3D
@@ -56,8 +72,9 @@ function output_vtk = skeleton_to_graph_vtk(skeleton_nii, output_vtk, connectivi
     end
 
     % Build command
-    % Use xyz coordinate system by default to match vmtkcenterlines output
-    % This ensures centerlines align properly when viewed with vmtk_viewVolAndSurf
+    % Use RAS coordinate system by default (standard NIfTI coordinate system)
+    % The NIfTI affine transformation matrix is stored in VTK FieldData for reference
+    % This allows tools to properly handle coordinate system transformations
     cmd = sprintf('python "%s" "%s" "%s" --connectivity %d --coordinate-system xyz', ...
         python_script, skeleton_nii, output_vtk, connectivity);
     
