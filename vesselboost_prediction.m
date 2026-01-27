@@ -44,6 +44,6 @@ function vesselboost_prediction(inFile, outFile, psFile, pretrained, prep_mode)
 
     % move from tmp dirs to original files
     if rmFlag; rmdir(fileparts(in), 's'); end
-    if exist(psFile,'var') && ~isempty(psFile); movefile(ps,psFile); rmdir(fileparts(ps), 's'); end
+    if exist('psFile','var') && ~isempty(psFile); movefile(ps,psFile); rmdir(fileparts(ps), 's'); end
     movefile(out,outFile); rmdir(fileparts(out), 's');
 end
