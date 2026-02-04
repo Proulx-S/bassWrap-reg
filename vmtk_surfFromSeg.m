@@ -32,4 +32,8 @@ function vmtk_surfFromSeg(input_seg_nii, output_vtk_file, options)
     if ~exist(output_vtk_file,'file') || dir(output_vtk_file).bytes < 100
         error('Surface mesh creation failed - file is empty or missing. Check segmentation values.');
     end
+    
+    % Add NIfTI spatial metadata so downstream (e.g. vmtk_viewVolAndSurf) can align
+    % when viewing with a different volume (resolution/crop).
+    vtk_add_nifti_metadata(output_vtk_file, input_seg_nii);
 end

@@ -38,7 +38,7 @@ function cmd = vmtk_centerlinesFromSurf(surface_vtk, output_centerlines_vtk, sou
         if length(source_point) ~= 3 || length(target_point) ~= 3
             error('source_point and target_point must be 3-element vectors [x, y, z]');
         end
-        cmd{end+1} = ['-seedselector pointlist \'];
+        % cmd{end+1} = ['-seedselector pointlist \'];
         cmd{end+1} = ['-sourcepoints ' num2str(source_point(1)) ' ' num2str(source_point(2)) ' ' num2str(source_point(3)) ' \'];
         cmd{end+1} = ['-targetpoints ' num2str(target_point(1)) ' ' num2str(target_point(2)) ' ' num2str(target_point(3)) ' \'];
     else
