@@ -13,21 +13,19 @@ affine.
 Usage:
     python vmtk_align_surface_to_image.py <volume_nii> <surface_vtk> <output_surface_vtk> [source_nii]
 
-If the surface has no NIfTI_Affine in FieldData, you can pass the source NIfTI (the
-image the surface was created from) as source_nii so we treat surface points as RAS
-for that image. If FieldData is present, source_nii is ignored.
+Alignment is only performed when source_nii is passed. Stored spatial info (FieldData
+SourceNIfTI) is NOT used by default; if present and source_nii was not passed, a
+message is printed explaining how to have alignment applied by passing the source
+NIfTI path as the 4th argument.
+
+Dependencies: VTK is always required. nibabel is only required when source_nii is
+passed (i.e. when alignment is requested).
 """
 
 from __future__ import print_function
 import sys
 import os
 import numpy as np
-
-try:
-    import nibabel as nib
-except ImportError:
-    print('Error: nibabel is required.', file=sys.stderr)
-    sys.exit(1)
 
 try:
     import vtk
@@ -37,7 +35,8 @@ except ImportError:
 
 
 def get_affine_from_nifti(nii_file):
-    """Return 4x4 affine (voxel to RAS) from NIfTI."""
+    """Return 4x4 affine (voxel to RAS) from NIfTI. Requires nibabel (imported lazily)."""
+    import nibabel as nib
     nii = nib.load(nii_file)
     return nii.header.get_best_affine()
 
@@ -109,13 +108,30 @@ def _same_file(a, b):
 
 def align_surface_to_volume(volume_nii, surface_vtk, output_vtk, source_nii=None):
     """
-    Read surface and volume affines, transform surface points so they align
-    with the volume in the viewer, write to output_vtk.
-    When volume and surface source are the same file, copy surface unchanged.
+    When source_nii is given: transform surface so it aligns with the volume
+    (unless volume and source are the same file, then copy). When source_nii is
+    not given: do not use FieldData; copy surface unchanged. If VTK has
+    SourceNIfTI in FieldData and source_nii was not passed, print a message.
     """
     vol_affine = get_affine_from_nifti(volume_nii)
     polydata = read_polydata(surface_vtk)
-    surface_source = get_source_nifti_from_vtk_fielddata(polydata) or source_nii
+    has_fielddata = get_source_nifti_from_vtk_fielddata(polydata) is not None
+
+    # Use stored spatial info only when user explicitly passed source_nii
+    if source_nii is None:
+        if has_fielddata:
+            print(
+                'Note: This VTK has spatial metadata (SourceNIfTI in FieldData). '
+                'Alignment to the volume was NOT applied by default. To have the '
+                'mesh aligned when volume and mesh come from different NIfTIs, '
+                'pass the source NIfTI path as the 4th argument (source_nii), e.g.:\n'
+                '  vmtk_viewVolAndSurf(volume_nii, surface_vtk, printFlag, source_nii)',
+                file=sys.stderr
+            )
+        write_polydata(polydata, output_vtk)
+        return output_vtk
+
+    surface_source = source_nii
 
     # If surface was created from the same NIfTI we're viewing, no transform needed
     if _same_file(volume_nii, surface_source):

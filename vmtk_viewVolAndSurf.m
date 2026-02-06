@@ -17,7 +17,9 @@ function vmtk_viewVolAndSurf(volume_nii, surface_vtk, printFlag, source_nii)
     %
     % What this does
     % --------------
-    % Opens one VMTK window with the volume slices and the mesh overlaid. Before
+    % Opens one VMTK window with the volume slices and the mesh overlaid. The
+    % volume is shown with texture interpolation off (-textureinterpolation 0)
+    % so it appears pixelated (nearest-neighbor), not smoothed. Before
     % calling VMTK, the mesh is aligned to the volume using NIfTI spatial info
     % so they register even when the volume and the mesh come from different
     % NIfTIs (e.g. different resolution or crop).
@@ -26,36 +28,40 @@ function vmtk_viewVolAndSurf(volume_nii, surface_vtk, printFlag, source_nii)
     % -----------------------
     % If the surface was built from one NIfTI (e.g. a cropped segmentation) and
     % you view with another (e.g. full-resolution TOF), raw coordinates would
-    % not match and the mesh would look shifted. This function fixes that by:
-    %   1. Reading the volume NIfTI affine (voxel -> physical/RAS).
-    %   2. If the mesh has FieldData SourceNIfTI (or you pass source_nii), we
-    %      know which NIfTI the mesh refers to. When that differs from volume_nii,
-    %      we transform the mesh into the volume's display space and write
-    %      <surface_vtk base>_aligned.vtk. VMTK is then called with that file.
-    %   3. If the mesh was created from the same NIfTI as volume_nii, no transform
-    %      is applied (we just copy the mesh to _aligned.vtk).
+    % not match and the mesh would look shifted. Alignment is only performed
+    % when you pass the source NIfTI as the 4th argument (source_nii). Then:
+    %   1. The volume NIfTI affine is read (voxel -> physical/RAS).
+    %   2. When source_nii differs from volume_nii, the mesh is transformed into
+    %      the volume's display space and written to <surface_vtk base>_aligned.vtk.
+    %      VMTK is called with that file.
+    %   3. When source_nii and volume_nii are the same file, no transform is applied.
     %
     % Giving the mesh a "source" (so alignment can run)
     % -------------------------------------------------
-    % The alignment script needs to know which NIfTI the mesh came from. Two ways:
-    %   (1) FieldData on the VTK: NIfTI_Affine, CoordinateSystem, SourceNIfTI.
-    %       Surfaces from vmtk_surfFromSeg get this on the raw output; for the
-    %       final smoothed surface, call vtk_add_nifti_metadata(surface_vtk, seg_nii)
-    %       after your pipeline (e.g. in doIt_singleSlabTofVolPrc).
-    %   (2) Pass source_nii as the 4th argument. Use this for centerlines or any
-    %       VTK that does not have FieldData, e.g.:
-    %       vmtk_viewVolAndSurf(scaleMaxTof, vesselCenterlineList{v}, 0, fSegList{v})
+    % By default the viewer does NOT use stored spatial information (FieldData)
+    % for alignment. If the VTK has FieldData (SourceNIfTI), a message is printed
+    % on the terminal explaining how to have alignment applied.
+    %
+    % To have the mesh aligned when volume_nii and the mesh's source differ:
+    %   (1) Pass the source NIfTI path as the 4th argument (source_nii). That is
+    %       the NIfTI the mesh was created from (e.g. the segmentation). Example:
+    %       vmtk_viewVolAndSurf(scaleMaxTof, vesselSurfList{v}, 0, fSegList{v})
+    %   (2) The VTK may have that path stored in FieldData (vtk_add_nifti_metadata,
+    %       or vmtk_surfFromSeg on the raw output). Stored info is not used by
+    %       default; you still pass source_nii when you want alignment (e.g. the
+    %       same path as in FieldData). Use read_vtk_fielddata.py <surface_vtk>
+    %       to see stored SourceNIfTI.
     %
     % Examples
     % --------
-    %   % Same NIfTI as segmentation (no transform):
+    %   % View with same NIfTI as mesh source (no alignment needed):
     %   vmtk_viewVolAndSurf(fSegList{v}, vesselSurfList{v});
     %
-    %   % Different volume (e.g. full TOF); surface should have FieldData or pass source_nii:
-    %   vmtk_viewVolAndSurf(scaleMaxTof, vesselSurfList{v});
+    %   % View with different volume (e.g. full TOF); pass source_nii so mesh is aligned:
+    %   vmtk_viewVolAndSurf(scaleMaxTof, vesselSurfList{v}, 0, fSegList{v});
     %   vmtk_viewVolAndSurf(scaleMaxTof, vesselCenterlineList{v}, 0, fSegList{v});
     %
-    % See also: vtk_add_nifti_metadata, vmtk_align_surface_to_image.py, read_vtk_fielddata.py
+    % See also: vmtk_viewVol, vtk_add_nifti_metadata, vmtk_align_surface_to_image.py, read_vtk_fielddata.py
     %
     global src;
     
@@ -74,27 +80,27 @@ function vmtk_viewVolAndSurf(volume_nii, surface_vtk, printFlag, source_nii)
         error('Surface file not found: %s', surface_vtk);
     end
     
-    % Align surface to volume using NIfTI spatial information so they register
-    % when volume and surface come from different resolutions/crops.
-    script_dir = fileparts(mfilename('fullpath'));
-    align_script = fullfile(script_dir, 'vmtk_align_surface_to_image.py');
-    aligned_surface = replace(surface_vtk, '.vtk', '_aligned.vtk');
-    align_cmd = sprintf('python "%s" "%s" "%s" "%s"', align_script, volume_nii, surface_vtk, aligned_surface);
+    % Only run alignment when user requests it by passing source_nii.
     if ~isempty(source_nii) && exist(source_nii, 'file')
-        align_cmd = [align_cmd ' "' source_nii '"'];
+        script_dir = fileparts(mfilename('fullpath'));
+        align_script = fullfile(script_dir, 'vmtk_align_surface_to_image.py');
+        aligned_surface = replace(surface_vtk, '.vtk', '_aligned.vtk');
+        align_cmd = sprintf('python "%s" "%s" "%s" "%s" "%s"', align_script, volume_nii, surface_vtk, aligned_surface, source_nii);
+        [align_ok, align_err] = system(align_cmd, '-echo');
+        if align_ok ~= 0
+            error('Surface alignment failed: %s', align_err);
+        end
+        surface_to_show = aligned_surface;
+    else
+        surface_to_show = surface_vtk;
     end
-    [align_ok, align_err] = system(align_cmd, '-echo');
-    if align_ok ~= 0
-        error('Surface alignment failed: %s', align_err);
-    end
-    surface_to_show = aligned_surface;
     
-    % Build VMTK command (surface_to_show is already aligned to volume_nii above)
+    % Build VMTK command
     cmd = {src.vmtk};
     cmd{end+1} = [         'vmtkimagereader -ifile ' volume_nii ' \'];
     cmd{end+1} = ['--pipe vmtksurfacereader -ifile ' surface_to_show ' \'];
     cmd{end+1} = ['--pipe vmtkrenderer \'];
-    cmd{end+1} = ['--pipe vmtkimageviewer   -i @vmtkimagereader.o   -display 0 \'];
+    cmd{end+1} = ['--pipe vmtkimageviewer   -i @vmtkimagereader.o   -display 0 -textureinterpolation 0 \'];
     cmd{end+1} = ['--pipe vmtksurfaceviewer -i @vmtksurfacereader.o -display 1'  ];
     
 
